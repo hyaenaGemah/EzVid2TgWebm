@@ -4,7 +4,7 @@ namespace EzVid2TgWebm.Const
 {
     public class Constants
     {
-        public static int MAX_FILE_SIZE = 262144; // 256 Kilobyes.
+        public static int MAX_FILE_SIZE = 262144; // 256 Kilobytes.
         public static readonly string FFMPEG_COMMAND_TEMPLATE = "-y -i \"{0}.mp4\" -r 30 -t 2.99 -an -c:v libvpx-vp9 -pix_fmt yuva420p -s 512x512 -b:v {1}K {2}.webm";
         public static readonly string FFMPEG_LINUX_PATH = @"./ffmpeg/ffmpeg";
         public static readonly string FFMPEG_WIN_PATH = @".\ffmpeg\ffmpeg.exe";

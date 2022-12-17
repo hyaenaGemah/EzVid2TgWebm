@@ -1,5 +1,5 @@
 ﻿using System.Diagnostics;
-using System.IO;
+using System.Management.Automation;
 using System.Runtime.InteropServices;
 using EzVid2TgWebm.Const;
 
@@ -98,20 +98,29 @@ namespace EzVid2TgWebm
             string filename = Path.GetFileNameWithoutExtension(fileFullPath);
             string filePathAndName = Path.GetDirectoryName(fileFullPath) + (isWin ? '\\' : '/') + filename;
             string cmdArgs = string.Format(Constants.FFMPEG_COMMAND_TEMPLATE, filePathAndName, bitrate, outputPath);
-            ProcessStartInfo process = new ProcessStartInfo(executablePath, cmdArgs)
-            {
-                CreateNoWindow = true,
-                RedirectStandardError = true,
-                RedirectStandardInput = false,
-                RedirectStandardOutput = false,
-                UseShellExecute = false
-            };
 
-            using (Process? current = Process.Start(process))
+            if (!isWin)
             {
-                while (!(current?.HasExited).GetValueOrDefault())
+                ProcessStartInfo process = new ProcessStartInfo(executablePath, cmdArgs)
                 {
-                    // Await...
+                    CreateNoWindow = true,
+                    RedirectStandardError = true,
+                    RedirectStandardInput = false,
+                    RedirectStandardOutput = false,
+                    UseShellExecute = false
+                };
+
+                using (Process? current = Process.Start(process))
+                {
+                    current?.WaitForExit();
+                }
+            }
+            else
+            {
+                using (PowerShell ps = PowerShell.Create())
+                {
+                    ps.AddScript($"{executablePath} {cmdArgs}");
+                    ps.Invoke();
                 }
             }
         }

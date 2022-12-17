@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "EzVid2TgWebm": {
+      "commandName": "Project",
+      "commandLineArgs": "C:\\Users\\Gemah\\Downloads\\SampleVideo_1280x720_1mb.mp4"
+    }
+  }
+}
