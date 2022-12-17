@@ -13,7 +13,7 @@
             "program": "${workspaceFolder}/bin/Debug/net6.0/EzVid2TgWebm.dll",
             "args": [
                 "/home/gemah/Downloads/Snowfall-slow-freegrapha.mp4",
-                "1536"
+                "1024"
             ],
             "cwd": "${workspaceFolder}",
             // For more information about the 'console' field, see https://aka.ms/VSCode-CS-LaunchJson-Console

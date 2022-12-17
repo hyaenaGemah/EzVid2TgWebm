@@ -53,6 +53,7 @@ namespace EzVid2TgWebm
                     File.Delete(outputFilePath);
                 }
 
+                Console.WriteLine("Starting video file conversion...");
                 RunConversionProcess(isWin, fileFullPath, bitrate, outputPath);
                 bool fileConverted = File.Exists(outputFilePath);
                 long fileSize = new FileInfo(outputFilePath).Length;
@@ -83,6 +84,17 @@ namespace EzVid2TgWebm
         private static void RunConversionProcess(bool isWin, string fileFullPath, int bitrate, string outputPath)
         {
             string executablePath = isWin ? Constants.FFMPEG_WIN_PATH : Constants.FFMPEG_LINUX_PATH;
+
+            if ((!File.Exists(executablePath) && isWin))
+            {
+                throw new FileNotFoundException("Windows FFMPEG executable was not found!");
+            }
+            else if ((!File.Exists(executablePath) && !isWin))
+            {
+                Console.WriteLine("Linux FFMPEG binary not detected, attempting package installation instead.");
+                executablePath = "ffmpeg";
+            }
+
             string filename = Path.GetFileNameWithoutExtension(fileFullPath);
             string filePathAndName = Path.GetDirectoryName(fileFullPath) + (isWin ? '\\' : '/') + filename;
             string cmdArgs = string.Format(Constants.FFMPEG_COMMAND_TEMPLATE, filePathAndName, bitrate, outputPath);
