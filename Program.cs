@@ -1,36 +1,20 @@
 ﻿using System.Diagnostics;
+using System.IO;
 using System.Runtime.InteropServices;
-using System.Text;
+using EzVid2TgWebm.Const;
 
 namespace EzVid2TgWebm
 {
     public class Program
     {
-        private const string FFMPEG_COMMAND = "-y -i \"{0}.mp4\" -r 30 -t 2.99 -an -c:v libvpx-vp9 -pix_fmt yuva420p -s 512x512 -b:v {1}K {2}.webm";
-        private const string FFMPEG_LINUX_X64_PATH = @"./ffmpeg/linux_x64/ffmpeg";
-        private const string FFMPEG_LINUX_X86_PATH = @"./ffmpeg/linux_x86/ffmpeg";
-        private const string FFMPEG_WIN_X86_PATH = @".\ffmpeg\win_x86\ffmpeg.exe";
-
         public static void Main(string[] args)
         {
             try
             {
                 if (args.Length == 0 || string.IsNullOrEmpty(args.FirstOrDefault()))
                 {
-                    StringBuilder howToMsg = new StringBuilder().AppendLine("=== HOW TO USE ===\n")
-                                                                .Append("1. Use a command line tool and type the executable name, ")
-                                                                .Append("followed by the full path to the file and the expected bit rate. ")
-                                                                .AppendLine("If the full path contains any white spaces, include it between quotations (\"\").")
-                                                                .AppendLine("\n    Example:\n\t\t * EzVid2TgWebm.exe \"C:\\video to convert\\file.mp4\" 600")
-                                                                .AppendLine("\t\t * EzVid2TgWebm /home/videos/file.mp4 800\n")
-                                                                .Append("2. If the file is not within specifications, either the program won't perform the ")
-                                                                .AppendLine("conversion or the outcome may not be what is expected.\n")
-                                                                .Append("3. This program expects a mp4 video file with 512x512 resolution, max of 3 secs. duration ")
-                                                                .AppendLine("and 30 fps at most.\n")
-                                                                .Append("4. The program will output the file in the WEBM format, compatible with the Telegram ")
-                                                                .Append("sticker bot. The bot is the recommended tool for creating the actual stickers, this ")
-                                                                .AppendLine("program merely trivializes the video conversion step.\n");
-                    Console.WriteLine(howToMsg.ToString());
+                    Console.WriteLine(Constants.HelpMessage());
+                    Console.ReadKey();
                     return;
                 }
 
@@ -53,15 +37,6 @@ namespace EzVid2TgWebm
                     throw new FileNotFoundException("File not found!");
                 }
 
-                bool isWin = RuntimeInformation.IsOSPlatform(OSPlatform.Windows);
-                bool isX64 = RuntimeInformation.OSArchitecture == Architecture.X64;
-                string executablePath = FFMPEG_WIN_X86_PATH;
-
-                if (!isWin)
-                {
-                    executablePath = isX64 ? FFMPEG_LINUX_X64_PATH : FFMPEG_LINUX_X86_PATH;
-                }
-
                 string fileExtension = Path.GetExtension(fileFullPath).ToUpperInvariant().Substring(1);
 
                 if (!fileExtension.Equals("MP4"))
@@ -69,33 +44,30 @@ namespace EzVid2TgWebm
                     throw new FormatException($"File is not compatible: {fileExtension}");
                 }
 
+                bool isWin = RuntimeInformation.IsOSPlatform(OSPlatform.Windows);
                 string outputPath = (isWin ? ".\\output" : "./output");
+                string outputFilePath = $"{outputPath}.webm";
 
-                if (File.Exists($"{outputPath}.webm"))
+                if (File.Exists(outputFilePath))
                 {
-                    File.Delete($"{outputPath}.webm");
+                    File.Delete(outputFilePath);
                 }
 
-                string filename = Path.GetFileNameWithoutExtension(fileFullPath);
-                string filePathAndName = Path.GetDirectoryName(fileFullPath) + (isWin ? '\\' : '/') + filename;
-                string cmdArgs = string.Format(FFMPEG_COMMAND, filePathAndName, bitrate, outputPath);
-                ProcessStartInfo process = new ProcessStartInfo(executablePath, cmdArgs)
-                {
-                    CreateNoWindow = true,
-                    RedirectStandardError = true,
-                    RedirectStandardInput = false,
-                    RedirectStandardOutput = false,
-                    UseShellExecute = false
-                };
-                bool fileConverted;
+                RunConversionProcess(isWin, fileFullPath, bitrate, outputPath);
+                bool fileConverted = File.Exists(outputFilePath);
+                long fileSize = new FileInfo(outputFilePath).Length;
 
-                using (Process? current = Process.Start(process))
+                if (fileSize > Constants.MAX_FILE_SIZE)
                 {
-                    while (!(current?.HasExited).GetValueOrDefault())
+                    do
                     {
-                        // Await...
+                        bitrate = (int)(0.9 * bitrate);
+                        Console.WriteLine($"Generated file is bigger than 256 kilobytes. Reattempting conversion with smaller bitrate: {bitrate}.");
+                        RunConversionProcess(isWin, fileFullPath, bitrate, outputPath);
+                        fileConverted = File.Exists(outputFilePath);
+                        fileSize = new FileInfo(outputFilePath).Length;
                     }
-                    fileConverted = File.Exists($"{outputPath}.webm");
+                    while (fileSize > Constants.MAX_FILE_SIZE);
                 }
 
                 Console.WriteLine($"Process finished. Result: {(!fileConverted ? "FAILURE" : "SUCCESS")}");
@@ -105,6 +77,30 @@ namespace EzVid2TgWebm
                 Console.WriteLine(ex is NullReferenceException ?
                                   $"Unexpected Failure: {ex.Message}\n{ex.StackTrace}" :
                                   $"Failure: {ex.Message}");
+            }
+        }
+
+        private static void RunConversionProcess(bool isWin, string fileFullPath, int bitrate, string outputPath)
+        {
+            string executablePath = isWin ? Constants.FFMPEG_WIN_PATH : Constants.FFMPEG_LINUX_PATH;
+            string filename = Path.GetFileNameWithoutExtension(fileFullPath);
+            string filePathAndName = Path.GetDirectoryName(fileFullPath) + (isWin ? '\\' : '/') + filename;
+            string cmdArgs = string.Format(Constants.FFMPEG_COMMAND_TEMPLATE, filePathAndName, bitrate, outputPath);
+            ProcessStartInfo process = new ProcessStartInfo(executablePath, cmdArgs)
+            {
+                CreateNoWindow = true,
+                RedirectStandardError = true,
+                RedirectStandardInput = false,
+                RedirectStandardOutput = false,
+                UseShellExecute = false
+            };
+
+            using (Process? current = Process.Start(process))
+            {
+                while (!(current?.HasExited).GetValueOrDefault())
+                {
+                    // Await...
+                }
             }
         }
     }

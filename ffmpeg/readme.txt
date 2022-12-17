@@ -1,0 +1,1 @@
+Place the ffmpeg executable here, according to your Operating System and Architecture.
