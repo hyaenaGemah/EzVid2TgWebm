@@ -117,9 +117,11 @@ namespace EzVid2TgWebm
             }
             else
             {
+                string fullExecutablePath = Path.GetFullPath(executablePath);
+
                 using (PowerShell ps = PowerShell.Create())
                 {
-                    ps.AddScript($"{executablePath} {cmdArgs}");
+                    ps.AddScript($"{fullExecutablePath} {cmdArgs}");
                     ps.Invoke();
                 }
             }
