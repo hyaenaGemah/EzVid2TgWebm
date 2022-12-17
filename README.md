@@ -3,6 +3,8 @@
 
 *A program to trivialize video conversion to a Telegram Video Sticker compatible format.*
 
+***This program requires the [.NET 6.0 Runtime](https://dotnet.microsoft.com/en-us/download/dotnet/6.0) in order to work.***
+
 This is a lazy program for converting MP4 video files into WebM video files ready for making Telegram Video Stickers.
 For reference, Telegram Video Stickers require the input file to:
 
