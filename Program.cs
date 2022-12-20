@@ -1,7 +1,6 @@
-﻿using System.Diagnostics;
-using System.Management.Automation;
-using System.Runtime.InteropServices;
+﻿using System.Runtime.InteropServices;
 using EzVid2TgWebm.Const;
+using EzVid2TgWebm.Core;
 
 namespace EzVid2TgWebm
 {
@@ -11,67 +10,62 @@ namespace EzVid2TgWebm
         {
             try
             {
-                if (args.Length == 0 || string.IsNullOrEmpty(args.FirstOrDefault()))
+                bool windowsMode = RuntimeInformation.IsOSPlatform(OSPlatform.Windows);
+                string inputFolder = windowsMode ?
+                                     Path.GetFullPath(Constants.PATH_WIN_INPUT) :
+                                     Path.GetFullPath(Constants.PATH_LINUX_INPUT);
+                string outputFolder = windowsMode ?
+                                      Path.GetFullPath(Constants.PATH_WIN_OUTPUT) :
+                                      Path.GetFullPath(Constants.PATH_LINUX_OUTPUT);
+
+                // Create input and output folders: Stop execution if no input folder was detected
+                if (!Directory.Exists(inputFolder))
                 {
-                    Console.WriteLine(Constants.HelpMessage());
-                    Console.ReadKey();
+                    Directory.CreateDirectory(inputFolder);
+                    Console.WriteLine($"Input folder created. Add all files to convert in:\n{inputFolder}");
                     return;
                 }
 
-                string fileFullPath = args[0];
-                int bitrate = 512;
-
-                if (args.Length < 2)
+                if (!Directory.Exists(outputFolder))
                 {
-                    Console.WriteLine("No bitrate informed, using standard value (512 kbps)");
+                    Directory.CreateDirectory(outputFolder);
+                    Console.WriteLine($"Output folder created. All convert files will be created in:\n{outputFolder}");
                 }
                 else
                 {
-                    bool validBitrate = int.TryParse(args[1], out int parsedBitrate);
-                    bitrate = validBitrate ? parsedBitrate : 512;
-                    Console.WriteLine(validBitrate ? $"Using custom bitrate: {bitrate} kbps" : "No bitrate informed, using standard value (512 kbps)");
-                }
+                    FileInfo[] oldFiles = new DirectoryInfo(outputFolder).GetFiles();
 
-                if (!File.Exists(fileFullPath))
-                {
-                    throw new FileNotFoundException("File not found!");
-                }
-
-                string fileExtension = Path.GetExtension(fileFullPath).ToUpperInvariant().Substring(1);
-
-                if (!fileExtension.Equals("MP4"))
-                {
-                    throw new FormatException($"File is not compatible: {fileExtension}");
-                }
-
-                bool isWin = RuntimeInformation.IsOSPlatform(OSPlatform.Windows);
-                string outputPath = (isWin ? ".\\output" : "./output");
-                string outputFilePath = $"{outputPath}.webm";
-
-                if (File.Exists(outputFilePath))
-                {
-                    File.Delete(outputFilePath);
-                }
-
-                Console.WriteLine("Starting video file conversion...");
-                RunConversionProcess(isWin, fileFullPath, bitrate, outputPath);
-                bool fileConverted = File.Exists(outputFilePath);
-                long fileSize = new FileInfo(outputFilePath).Length;
-
-                if (fileSize > Constants.MAX_FILE_SIZE)
-                {
-                    do
+                    foreach (FileInfo file in oldFiles)
                     {
-                        bitrate = (int)(0.9 * bitrate);
-                        Console.WriteLine($"Generated file is bigger than 256 kilobytes. Reattempting conversion with smaller bitrate: {bitrate}.");
-                        RunConversionProcess(isWin, fileFullPath, bitrate, outputPath);
-                        fileConverted = File.Exists(outputFilePath);
-                        fileSize = new FileInfo(outputFilePath).Length;
+                        file.Delete();
                     }
-                    while (fileSize > Constants.MAX_FILE_SIZE);
                 }
 
-                Console.WriteLine($"Process finished. Result: {(!fileConverted ? "FAILURE" : "SUCCESS")}");
+                int bitrate = 512;
+
+                if (args.Length == 0)
+                {
+                    Console.WriteLine("No bitrate informed, using default value (512 kbps)");
+                }
+                else
+                {
+                    bool validBitrate = int.TryParse(args[0], out int parsedBitrate);
+                    bitrate = validBitrate ? parsedBitrate : 512;
+                    Console.WriteLine(validBitrate ? $"Using custom bitrate: {bitrate} kbps" : "No valid bitrate informed, using standard value (512 kbps)");
+                }
+
+                // Get all files from the input folder
+                IEnumerable<string> foundFiles = new FileHandler().GetAllInputFilenames(inputFolder);
+
+                // Convert each of the files
+                foreach (string filename in foundFiles)
+                {
+                    FfmpegHandler handler = new FfmpegHandler(windowsMode);
+                    handler.ConvertVideo(filename, bitrate);
+                    Console.WriteLine("Video conversion finished.\n");
+                }
+
+                Console.WriteLine("PROCESS FINISHED.");
             }
             catch (Exception ex)
             {
@@ -79,51 +73,10 @@ namespace EzVid2TgWebm
                                   $"Unexpected Failure: {ex.Message}\n{ex.StackTrace}" :
                                   $"Failure: {ex.Message}");
             }
-        }
-
-        private static void RunConversionProcess(bool isWin, string fileFullPath, int bitrate, string outputPath)
-        {
-            string executablePath = isWin ? Constants.FFMPEG_WIN_PATH : Constants.FFMPEG_LINUX_PATH;
-
-            if ((!File.Exists(executablePath) && isWin))
+            finally
             {
-                throw new FileNotFoundException("Windows FFMPEG executable was not found!");
-            }
-            else if ((!File.Exists(executablePath) && !isWin))
-            {
-                Console.WriteLine("Linux FFMPEG binary not detected, attempting package installation instead.");
-                executablePath = "ffmpeg";
-            }
-
-            string filename = Path.GetFileNameWithoutExtension(fileFullPath);
-            string filePathAndName = Path.GetDirectoryName(fileFullPath) + (isWin ? '\\' : '/') + filename;
-            string cmdArgs = string.Format(Constants.FFMPEG_COMMAND_TEMPLATE, filePathAndName, bitrate, outputPath);
-
-            if (!isWin)
-            {
-                ProcessStartInfo process = new ProcessStartInfo(executablePath, cmdArgs)
-                {
-                    CreateNoWindow = true,
-                    RedirectStandardError = true,
-                    RedirectStandardInput = false,
-                    RedirectStandardOutput = false,
-                    UseShellExecute = false
-                };
-
-                using (Process? current = Process.Start(process))
-                {
-                    current?.WaitForExit();
-                }
-            }
-            else
-            {
-                string fullExecutablePath = Path.GetFullPath(executablePath);
-
-                using (PowerShell ps = PowerShell.Create())
-                {
-                    ps.AddScript($"{fullExecutablePath} {cmdArgs}");
-                    ps.Invoke();
-                }
+                Console.Write("\nPress any key to exit.");
+                Console.ReadKey();
             }
         }
     }
