@@ -43,7 +43,7 @@ Both releases have a script (Bash - for Linux, or Powershell - for Windows) in o
  
 In order to properly run the program, place all the video files in the *Input* folder and run the script (*from Console* if in Linux, *right-click and then click on "Run in Powershell" or similar option* if in Windows). If no issues happen during the process, the newly generated files will be in the *Output* folder.
  
-*WARNING:* *Be sure to copy any converted video file from the __Output__ folder __before running the program again, or it'll delete the previously generated files.__*
+**WARNING:** *Be sure to copy any converted video file from the __Output__ folder __before running the program again, or it'll delete the previously generated files.__*
  
 The program function like this in order to minimize any specific configuration or fine tuning in order to achieve the result of generating video files ready to be made into stickers.
 
